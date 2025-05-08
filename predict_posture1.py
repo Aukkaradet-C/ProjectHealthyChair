@@ -15,7 +15,7 @@ le = joblib.load("label_encoder.pkl")
 columns = ['L1', 'L3', 'L4', 'L2', 'SL', 'SR', 'WL', 'WR']
 
 # Connection
-
+# ตัวดึงข้อมูลจาก Azure IoT Hub
 connection_str = "Endpoint=sb://ihsuprodsgres009dednamespace.servicebus.windows.net/;SharedAccessKeyName=iothubowner;SharedAccessKey=3YhCwP8RZBp19lkiLQ1l8TYxrKE/i8LHwAIoTIYhXRY=;EntityPath=iothub-ehub-esp32chair-57141806-440a13ea34"
 eventhub_name = "iothub-ehub-esp32chair-57141806-440a13ea34"  # ดูจาก Azure Portal
 
