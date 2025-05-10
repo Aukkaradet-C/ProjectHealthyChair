@@ -55,12 +55,17 @@ def insert_to_db(timestamp, sensor_data, predicted_label, confidence_val, user_i
         print(f"❌ บันทึกผิดพลาด MySQL: {e}")
 
 
+import pymysql
+
 def get_current_user_id():
     try:
-        with open("user_session.json", "r") as f:
-            data = json.load(f)
-            return data.get("user_id")
-    except:
+        mysql_conn.ping(reconnect=True)  # สำคัญมาก ป้องกัน timeout
+        with mysql_conn.cursor() as cursor:
+            cursor.execute("SELECT user_id FROM user_session_tb WHERE is_active = 1 ORDER BY updated_at DESC LIMIT 1")
+            result = cursor.fetchone()
+            return result['user_id'] if result else None
+    except Exception as e:
+        print("⚠️ ดึง user_id จาก Hostinger ไม่ได้:", e)
         return None
 
 
@@ -70,17 +75,17 @@ def on_event(partition_context, event):
     try:
         user_id = get_current_user_id()
         if not user_id:
-            print("⚠️ ยังไม่มี user_id → รอผู้ใช้กดเริ่มนั่งจากแอป")
+            print("ยังไม่มี user_id → รอผู้ใช้กดเริ่มนั่งจากแอป")
             return
 
         payload = json.loads(event.body_as_str())
         sensor_data = payload.get("sensor")
 
         if not sensor_data or len(sensor_data) != 8:
-            print("⚠️ ข้อมูลไม่ถูกต้อง:", sensor_data)
+            print("ข้อมูลไม่ถูกต้อง:", sensor_data)
             return
 
-        # ✅ ใช้เวลาไทย
+        # ใช้เวลาไทย
         with lock:
             last_received_time = datetime.now(tz)
 
@@ -93,7 +98,7 @@ def on_event(partition_context, event):
         insert_to_db(datetime.now(tz), sensor_data, predicted_label, confidence_val, user_id)
 
     except Exception as e:
-        print(f"❌ ผิดพลาดใน on_event: {e}")
+        print(f"ผิดพลาดใน on_event: {e}")
 
     partition_context.update_checkpoint(event)
 
@@ -116,10 +121,10 @@ def offline_checker():
                             1.0,
                             user_id
                         )
-                        print(f"📴 บันทึก device_offline สำหรับ user_id={user_id}")
+                        print(f"บันทึก device_offline สำหรับ user_id={user_id}")
                         last_offline_insert_time = now
                     else:
-                        print("⚠️ ยังไม่มี user_id → ข้ามการบันทึก device_offline")
+                        print("ยังไม่มี user_id → ข้ามการบันทึก device_offline")
         time.sleep(5)
 
 
