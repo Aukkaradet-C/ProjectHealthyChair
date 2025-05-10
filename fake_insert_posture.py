@@ -1,32 +1,32 @@
-## Fake ข้อมูลเพื่อใช้ทดลองการแสดงผลบนแอป (By GPT)
-
 import random
 from datetime import datetime, timedelta
-import pyodbc
 import json
+import pymysql
 
-# SQL Azure Connection
-sql_conn_str = (
-    "DRIVER={ODBC Driver 17 for SQL Server};"
-    "SERVER=postureserver42.database.windows.net;"
-    "DATABASE=posturedb;"
-    "UID=adminuser42;"
-    "PWD=Fuckingpassword!;"
+# เชื่อมต่อ MySQL
+conn = pymysql.connect(
+    host='healthchairproject.online',
+    user='u497837279_Posturedb42',
+    password='Posturedb42',
+    database='u497837279_posturedb',
+    port=3306
 )
 
-conn = pyodbc.connect(sql_conn_str)
 cursor = conn.cursor()
 
-# วันที่ปลอมข้อมูล
-start_date = datetime(2025, 4, 21)  # เปลี่ยนตามที่ต้องการ
-end_date = datetime(2025, 4, 21)
+# userId ที่มีอยู่ในระบบ
+available_user_ids = [7, 9, 10]
 
-# ช่วงเวลาทำงาน (online)
+# กำหนดช่วงวันที่
+start_date = datetime(2025, 4, 1)
+end_date = datetime(2025, 4, 30)
+
+# ช่วงเวลาทำงาน
 online_start = timedelta(hours=12)
 online_end = timedelta(hours=18)
 interval = timedelta(seconds=10)
 
-# สัดส่วน label (random ต่อวัน)
+# ช่วงเปอร์เซ็นต์ของแต่ละท่า
 posture_ranges = {
     "correct_posture": (40, 70),
     "hunch_slight": (20, 40),
@@ -37,7 +37,7 @@ posture_ranges = {
     "lean_right": (0, 5)
 }
 
-# สร้าง sensor ตาม label
+# ฟังก์ชันสุ่มค่าจากเซ็นเซอร์ตามท่า
 def generate_sensor_data(label):
     if label == "device_offline":
         return [0] * 8
@@ -57,12 +57,14 @@ def generate_sensor_data(label):
         return [random.randint(250, 500), random.randint(250, 500), random.randint(100, 300), random.randint(200, 300), random.randint(0, 50), random.randint(0, 100), random.randint(100, 300), random.randint(400, 600)]
     return [0] * 8
 
-# เตรียม batch insert
+# เริ่มสร้างข้อมูล
 batch_data = []
 current_date = start_date
 total_inserted = 0
 
 while current_date <= end_date:
+    user_id_today = random.choice(available_user_ids)  # ✅ กำหนด userId ใหม่ทุกวัน
+
     proportions = {}
     remaining = 100
     for key, (low, high) in posture_ranges.items():
@@ -92,6 +94,7 @@ while current_date <= end_date:
             confidence = 1.0
 
         batch_data.append((
+            user_id_today,
             time_cursor.isoformat(),
             json.dumps(sensor_data),
             label,
@@ -100,20 +103,21 @@ while current_date <= end_date:
 
         time_cursor += interval
 
-    print(f"เตรียมข้อมูลวันที่ {current_date.strftime('%Y-%m-%d')} แล้ว")
+    print(f"✅ เตรียมข้อมูลวันที่ {current_date.strftime('%Y-%m-%d')} ของ user_id = {user_id_today}")
     current_date += timedelta(days=1)
 
-# แบ่ง batch insert
+# บันทึกลงฐานข้อมูล
 batch_size = 5000
 for i in range(0, len(batch_data), batch_size):
     chunk = batch_data[i:i + batch_size]
     cursor.executemany("""
-        INSERT INTO posture_predictions (timestamp, input_json, predicted_posture, confidence)
-        VALUES (?, ?, ?, ?)
+        INSERT INTO posture_data (user_id, timestamp, input_json, predicted_posture, confidence)
+        VALUES (%s, %s, %s, %s, %s)
     """, chunk)
+
     conn.commit()
     total_inserted += len(chunk)
-    print(f"INSERT แล้ว {total_inserted} / {len(batch_data)} แถว")
+    print(f"📝 INSERT แล้ว {total_inserted} / {len(batch_data)} แถว")
 
 conn.close()
-print("INSERT ข้อมูลทั้งหมดเรียบร้อยแล้ว (batch insert)!")
+print("✅ INSERT ข้อมูลทั้งหมดเรียบร้อยแล้ว (batch insert)!")
